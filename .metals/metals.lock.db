@@ -1,0 +1,6 @@
+#FileLock
+#Mon Oct 26 14:15:31 ULAT 2026
+hostName=localhost
+id=1a176d98e11dba75e9ee0e091e74779f1511bac6313
+method=file
+server=localhost\:50655
