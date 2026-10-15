@@ -45,7 +45,7 @@ public class BankerAlgorithm {
     }
 
     // Resource Request Algorithm: Шинэ хүсэлтийг шалгах ба хуваарилах
-    public static String requestResources(SystemState state, int processId, int[] request) {
+    public static String requestResources1(SystemState state, int processId, int[] request) {
         int m = state.getNumResources();
 
         // 1. Request <= Need шалгах
@@ -85,4 +85,40 @@ public class BankerAlgorithm {
             return "Цуцлагдсан: Хүсэлтийг биелүүлбэл систем Unsafe төлөвт орох тул цуцаллаа (Rollback).";
         }
     }
+
+    public record RequestResult(Status status, String message, List<Integer> safeSequence) {
+    public enum Status { GRANTED, MUST_WAIT, EXCEEDS_NEED, UNSAFE, INVALID }
+}
+
+public static RequestResult requestResources(SystemState state, int pid, int[] req) {
+    int m = state.getNumResources();
+
+    if (pid < 0 || pid >= state.getNumProcesses())
+        return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.INVALID, "Процессын ID буруу байна.", List.of());
+    if (req.length != m)
+        return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.INVALID, m + " утга оруулна уу.", List.of());
+    for (int r : req)
+        if (r < 0) return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.INVALID, "Сөрөг утга оруулах боломжгүй.", List.of());
+
+    for (int j = 0; j < m; j++)
+        if (req[j] > state.getNeed()[pid][j])
+            return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.EXCEEDS_NEED, "Хүсэлт Need-ээс хэтэрсэн.", List.of());
+    for (int j = 0; j < m; j++)
+        if (req[j] > state.getAvailable()[j])
+            return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.MUST_WAIT, "P" + pid + " хүлээх ёстой.", List.of());
+
+    SystemState trial = state.copy();           // хуулбар дээр туршина
+    for (int j = 0; j < m; j++) {
+        trial.getAvailable()[j]        -= req[j];
+        trial.getAllocation()[pid][j]  += req[j];
+        trial.getNeed()[pid][j]        -= req[j];
+    }
+
+    List<Integer> seq = new ArrayList<>();
+    if (checkSafety(trial, seq)) {
+        state.copyFrom(trial);                  // зөвхөн safe бол хэрэгжүүлнэ
+        return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.GRANTED, "Зөвшөөрөгдөв.", seq);
+    }
+    return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.UNSAFE, "Unsafe болох тул цуцаллаа.", List.of());
+}
 }

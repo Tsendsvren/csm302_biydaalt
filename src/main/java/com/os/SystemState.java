@@ -34,6 +34,20 @@ public class SystemState {
         return copy;
     }
 
+    public SystemState copy() {
+    return new SystemState(numProcesses, numResources, available, max, allocation);
+}
+
+public void copyFrom(SystemState other) {
+    this.available = other.available.clone();
+    this.allocation = deepCopy(other.allocation);
+    this.max = deepCopy(other.max);
+    recalculateNeed();
+}
+
+// Constructor дотор:
+// for i,j: if (allocation[i][j] > max[i][j]) throw new IllegalArgumentException(...)
+
     // Getters and Setters
     public int getNumProcesses() { return numProcesses; }
     public int getNumResources() { return numResources; }

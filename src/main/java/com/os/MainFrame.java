@@ -86,7 +86,7 @@ public class MainFrame extends JFrame {
             int[] req = new int[parts.length];
             for (int i = 0; i < parts.length; i++) req[i] = Integer.parseInt(parts[i].trim());
 
-            String res = BankerAlgorithm.requestResources(state, p, req);
+            String res = BankerAlgorithm.requestResources1(state, p, req);
             logArea.append(">> " + res + "\n");
             graphPanel.repaint();
         });
