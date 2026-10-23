@@ -4,121 +4,83 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BankerAlgorithm {
-    
-    // Safety Algorithm: Систем аюулгүй төлөвт байгааг шалгах
+    public record RequestResult(Status status, String message, List<Integer> safeSequence) {
+        public enum Status { GRANTED, MUST_WAIT, EXCEEDS_NEED, UNSAFE, INVALID }
+
+        public boolean isGranted() {
+            return status == Status.GRANTED;
+        }
+    }
+    public static boolean leq(int[] a, int[] b) {
+        for (int j = 0; j < a.length; j++) {
+            if (a[j] > b[j]) return false;
+        }
+        return true;
+    }
+
     public static boolean checkSafety(SystemState state, List<Integer> safeSequence) {
         int n = state.getNumProcesses();
         int m = state.getNumResources();
-        
-        int[] work = state.getAvailable().clone();
-        boolean[] finish = new boolean[n];
+
+        int[] work = state.getAvailable();
+        int[][] need = state.getNeed();
+        int[][] allocation = state.getAllocation();
+        boolean[] finish = state.getFinished();
         safeSequence.clear();
 
-        int count = 0;
-        while (count < n) {
-            boolean found = false;
+        while (true) {
+            int found = -1;
             for (int p = 0; p < n; p++) {
-                if (!finish[p]) {
-                    int j;
-                    for (j = 0; j < m; j++) {
-                        if (state.getNeed()[p][j] > work[j])
-                            break;
-                    }
-
-                    if (j == m) {
-                        for (int k = 0; k < m; k++) {
-                            work[k] += state.getAllocation()[p][k];
-                        }
-                        safeSequence.add(p);
-                        finish[p] = true;
-                        found = true;
-                        count++;
-                    }
+                if (!finish[p] && leq(need[p], work)) {
+                    found = p;
+                    break;
                 }
             }
-
-            if (!found) {
-                return false; // Unsafe state (Deadlock үүсэх эрсдэлтэй)
-            }
+            if (found < 0) break;
+            for (int k = 0; k < m; k++) work[k] += allocation[found][k];
+            finish[found] = true;
+            safeSequence.add(found);
         }
-        return true; // Safe state
+
+        for (boolean f : finish) {
+            if (!f) return false; // Unsafe
+        }
+        return true; // Safe
     }
 
-    // Resource Request Algorithm: Шинэ хүсэлтийг шалгах ба хуваарилах
-    public static String requestResources1(SystemState state, int processId, int[] request) {
+    public static RequestResult requestResources(SystemState state, int processId, int[] request) {
         int m = state.getNumResources();
 
-        // 1. Request <= Need шалгах
-        for (int j = 0; j < m; j++) {
-            if (request[j] > state.getNeed()[processId][j]) {
-                return "Алдаа: Хүсэлт нь тухайн процессын дээд хэрэгцээнээс (Need) хэтэрсэн байна!";
-            }
+        if (processId < 0 || processId >= state.getNumProcesses() || state.isFinished(processId))
+            return new RequestResult(RequestResult.Status.INVALID,
+                    "Алдаа: Процессын ID буруу эсвэл процесс аль хэдийн дууссан.", List.of());
+        if (request.length != m)
+            return new RequestResult(RequestResult.Status.INVALID,
+                    "Алдаа: " + m + " утга оруулна уу.", List.of());
+        for (int r : request) {
+            if (r < 0)
+                return new RequestResult(RequestResult.Status.INVALID,
+                        "Алдаа: Сөрөг утга оруулах боломжгүй.", List.of());
         }
 
-        // 2. Request <= Available шалгах
-        for (int j = 0; j < m; j++) {
-            if (request[j] > state.getAvailable()[j]) {
-                return "Анхаар: Системд бэлэн нөөц хүрэлцэхгүй тул P" + processId + " хүлээх ёстой.";
-            }
-        }
+        if (!leq(request, state.getNeed()[processId]))
+            return new RequestResult(RequestResult.Status.EXCEEDS_NEED,
+                    "Алдаа: Хүсэлт нь P" + processId + " процессын дээд хэрэгцээнээс (Need) хэтэрсэн.", List.of());
 
-        // 3. Түр хуваарилах (Pretend Allocation)
-        for (int j = 0; j < m; j++) {
-            state.getAvailable()[j] -= request[j];
-            state.getAllocation()[processId][j] += request[j];
-            state.getNeed()[processId][j] -= request[j];
-        }
+        if (!leq(request, state.getAvailable()))
+            return new RequestResult(RequestResult.Status.MUST_WAIT,
+                    "Анхаар: Бэлэн нөөц хүрэлцэхгүй тул P" + processId + " хүлээх ёстой.", List.of());
 
-        // 4. Safe State шалгах
-        List<Integer> safeSeq = new ArrayList<>();
-        boolean safe = checkSafety(state, safeSeq);
+        SystemState trial = state.copy();
+        trial.allocate(processId, request);
 
-        if (safe) {
-            return "Амжилттай: Хүсэлт зөвшөөрөгдөв. Систем Safe State-д байна. Safe Sequence: " + safeSeq;
-        } else {
-            // Unsafe бол буцаах (Rollback)
-            for (int j = 0; j < m; j++) {
-                state.getAvailable()[j] += request[j];
-                state.getAllocation()[processId][j] -= request[j];
-                state.getNeed()[processId][j] += request[j];
-            }
-            return "Цуцлагдсан: Хүсэлтийг биелүүлбэл систем Unsafe төлөвт орох тул цуцаллаа (Rollback).";
+        List<Integer> seq = new ArrayList<>();
+        if (checkSafety(trial, seq)) {
+            state.copyFrom(trial);
+            return new RequestResult(RequestResult.Status.GRANTED,
+                    "Амжилттай: Хүсэлт зөвшөөрөгдөв. Safe Sequence: " + seq, seq);
         }
+        return new RequestResult(RequestResult.Status.UNSAFE,
+                "Цуцлагдсан: Хүсэлтийг биелүүлбэл систем Unsafe төлөвт орно.", List.of());
     }
-
-    public record RequestResult(Status status, String message, List<Integer> safeSequence) {
-    public enum Status { GRANTED, MUST_WAIT, EXCEEDS_NEED, UNSAFE, INVALID }
-}
-
-public static RequestResult requestResources(SystemState state, int pid, int[] req) {
-    int m = state.getNumResources();
-
-    if (pid < 0 || pid >= state.getNumProcesses())
-        return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.INVALID, "Процессын ID буруу байна.", List.of());
-    if (req.length != m)
-        return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.INVALID, m + " утга оруулна уу.", List.of());
-    for (int r : req)
-        if (r < 0) return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.INVALID, "Сөрөг утга оруулах боломжгүй.", List.of());
-
-    for (int j = 0; j < m; j++)
-        if (req[j] > state.getNeed()[pid][j])
-            return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.EXCEEDS_NEED, "Хүсэлт Need-ээс хэтэрсэн.", List.of());
-    for (int j = 0; j < m; j++)
-        if (req[j] > state.getAvailable()[j])
-            return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.MUST_WAIT, "P" + pid + " хүлээх ёстой.", List.of());
-
-    SystemState trial = state.copy();           // хуулбар дээр туршина
-    for (int j = 0; j < m; j++) {
-        trial.getAvailable()[j]        -= req[j];
-        trial.getAllocation()[pid][j]  += req[j];
-        trial.getNeed()[pid][j]        -= req[j];
-    }
-
-    List<Integer> seq = new ArrayList<>();
-    if (checkSafety(trial, seq)) {
-        state.copyFrom(trial);                  // зөвхөн safe бол хэрэгжүүлнэ
-        return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.GRANTED, "Зөвшөөрөгдөв.", seq);
-    }
-    return new RequestResult(com.os.BankerAlgorithm.RequestResult.Status.UNSAFE, "Unsafe болох тул цуцаллаа.", List.of());
-}
 }
