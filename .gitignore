@@ -1,0 +1,9 @@
+# Compile хийсэн файл, IDE-ийн түр файл репозиторид оруулахгүй
+out/
+out-tests/
+bin/
+.metals/
+.bloop/
+.vscode/
+*.class
+*.lnk
