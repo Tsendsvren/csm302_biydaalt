@@ -1,0 +1,73 @@
+=== Banker's Algorithm тестүүд ===
+[PASS] T1a  Сурах бичгийн эхний төлөв SAFE
+       -> safe=true seq=[1, 3, 0, 2, 4]
+[PASS] T1b  Олдсон дараалал бие даасан шалгагчаар хүчинтэй (сурах бичгийн <P1,P3,P4,P0,P2>-аас өөр боловч зөв)
+       -> [1, 3, 0, 2, 4]
+[PASS] T1c  Сурах бичгийн <P1,P3,P4,P0,P2> дараалал мөн хүчинтэй
+       -> [1, 3, 4, 0, 2]
+[PASS] T2   P1 хүсэлт (1,0,2) зөвшөөрөгдөнө
+       -> GRANTED [1, 3, 0, 2, 4]
+[PASS] T2b  T2-ийн дараа Available=(2,3,0)
+       -> [2, 3, 0]
+[PASS] T3   P1-ийн дараа P4 хүсэлт (3,3,0): Available=(2,3,0) хүрэхгүй тул хүлээнэ
+       -> MUST_WAIT
+[PASS] T4   P0 хүсэлт (0,2,0): нөөц байгаа ч UNSAFE тул татгалзана
+       -> UNSAFE
+[PASS] T4b  Татгалзсны дараа төлөв өөрчлөгдөөгүй (Available=(2,3,0))
+       -> [2, 3, 0]
+[PASS] T4c  Эсрэг жишээ: ижил (0,2,0) хүсэлт эхний төлөвөөс GRANTED (төлөвөөс хамаарна)
+       -> initial state
+[PASS] T5   Хүсэлт > Need → EXCEEDS_NEED
+       -> EXCEEDS_NEED
+[PASS] T6a  Процессын ID хүрээнээс гарсан → INVALID
+       -> id=9
+[PASS] T6b  Сөрөг хүсэлт → INVALID
+       -> (-1,0,0)
+[PASS] T6c  Буруу урттай вектор → INVALID
+       -> len=2
+[PASS] T7a  Allocation > Max үед IllegalArgumentException
+       -> P0, R0: Allocation нь Max-аас их байж болохгүй.
+[PASS] T7b  Сөрөг Available үед IllegalArgumentException
+       -> Available[0] сөрөг байж болохгүй.
+[PASS] T8a  Тэг хүсэлт GRANTED
+       -> GRANTED
+[PASS] T8b  1 процесс, Need=0 → SAFE
+       -> [0]
+[PASS] T9a  Дасгал 8.9(а) Available=(0,3,0,1): үр дүн
+       -> safe=false seq=[2, 1, 3]
+[PASS] T9b  Дасгал 8.9(б) Available=(1,0,0,2): үр дүн
+       -> safe=true seq=[1, 2, 0, 3, 4]
+
+--- Симуляцийн хөдөлгүүр: сценари бүрийн эцсийн алхам ---
+1. Сурах бичгийн жишээ: хүсэлтүүд                              steps= 94  final=DONE     grants=8 waits=1 denied=2 done=5/5
+2. Нөөц байгаа ч өгөхгүй Banker АСААЛТТАЙ                      steps= 63  final=DONE     grants=4 waits=0 denied=3 done=3/3
+3. Банкиргүй бол: DEADLOCK Banker УНТРААТАЙ                    steps= 12  final=DEADLOCK grants=1 waits=0 denied=0 done=1/3
+4. Deadlock илрүүлэлт: түгжрэл ҮГҮЙ                            steps= 29  final=DONE     grants=3 waits=0 denied=0 done=5/5
+5. Deadlock илрүүлэлт: түгжрэл БАЙНА                           steps=  7  final=DEADLOCK grants=0 waits=0 denied=0 done=1/5
+6. 4 төрлийн нөөц сурах бичгийн дасгал 8.3)                    steps= 46  final=DONE     grants=5 waits=0 denied=0 done=5/5
+7. Сурах бичгийн дасгал 8.9 (а): Available = (0,3,0,1)         steps= 16  final=DEADLOCK grants=0 waits=0 denied=0 done=3/5
+8. Сурах бичгийн дасгал 8.9 (б): Available = (1,0,0,2)         steps= 37  final=DONE     grants=5 waits=0 denied=0 done=5/5
+9. Сурах бичгийн дасгал 8.28: хүсэлтүүд                        steps= 66  final=DONE     grants=7 waits=1 denied=0 done=5/5
+10. Том систем: 10 процесс, 4 нөөц                             steps=135  final=DONE     grants=12 waits=2 denied=0 done=10/10
+[PASS] T10a Сценари 3 (Banker унтраалттай) → DEADLOCK
+       -> DEADLOCK
+[PASS] T10b Сценари 2 (Banker асаалттай) → DONE (түгжрэлгүй)
+       -> DONE
+[PASS] T10c Сценари 4 → DONE, Сценари 5 → DEADLOCK
+       -> DONE / DEADLOCK
+[PASS] E1   Өөр өгөгдөл: Need-ээс хэтэрсэн хүсэлт → ERROR алхам, Татгалзсан=1
+       -> ERROR=true cDenied=1
+[PASS] E2   Захын тохиолдол: бүх Need=0 → DONE, 2/2 дууссан
+       -> DONE done=2
+[PASS] E3   Эхний төлөв UNSAFE ба бодит түгжрэл → DEADLOCK
+       -> DEADLOCK
+[PASS] E4   Max > Total (нийт нөөцөөс их хэрэгцээ) → DEADLOCK гэж тодорхойлно
+       -> DEADLOCK
+[PASS] F1   Fuzz 3000 санамсаргүй төлөв: checkSafety == брут-форс
+       -> зөрүү=0, SAFE төлөв=1927
+[PASS] F2   Fuzz: олдсон Safe sequence бүр бие даасан шалгагчаар хүчинтэй
+       -> буруу=0
+[PASS] F3   Fuzz: зөвшөөрөгдсөн хүсэлт бүрийн дараа систем SAFE хэвээр
+       -> зөвшөөрөгдсөн=716, зөрчил=0
+
+=== ДҮН: 29 PASS, 0 FAIL ===
